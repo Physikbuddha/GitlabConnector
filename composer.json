@@ -3,7 +3,7 @@
     "description": "Integrate GitLab estimate and spend to Kimai",
     "homepage": "https://github.com/librecodecoop/GitLabBundle",
     "type": "kimai-plugin",
-    "version": "0.1",
+    "version": "0.2",
     "keywords": [
         "kimai",
         "kimai-plugin"
@@ -33,7 +33,7 @@
     "extra": {
         "kimai": {
             "require": "1.11",
-            "version": "0.1",
+            "version": "0.2",
             "name": "GitLab integration"
         }
     },
