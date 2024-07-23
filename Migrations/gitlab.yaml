@@ -1,2 +1,2 @@
 migrations_paths:
-    KimaiPlugin\GitLabBundle\Migrations: var/plugins/GitLabBundle/Migrations
+    KimaiPlugin\GitlabConnector\Migrations: var/plugins/GitlabConnector/Migrations

@@ -1,7 +1,7 @@
 {
-    "name": "librecodecoop/kimai-gitlab-plugin",
+    "name": "physikbuddha/kimai-gitlab-connector-plugin",
     "description": "Integrate GitLab estimate and spend to Kimai",
-    "homepage": "https://github.com/librecodecoop/GitLabBundle",
+    "homepage": "https://github.com/physikbuddha/GitlabConnector",
     "type": "kimai-plugin",
     "version": "0.2",
     "keywords": [
@@ -14,11 +14,15 @@
             "name": "Vitor Mattos",
             "email": "vitor@php.rio",
             "homepage": "https://github.com/vitormattos"
+        },
+        {
+            "name": "Robert Kärner",
+            "homepage": "https://github.com/physikbuddha"
         }
     ],
     "autoload": {
         "psr-4": {
-            "KimaiPlugin\\GitlabBundle\\": ""
+            "KimaiPlugin\\GitlabConnector\\": ""
         }
     },
     "config": {

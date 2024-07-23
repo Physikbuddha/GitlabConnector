@@ -1,4 +1,4 @@
-# GitLabBundle
+# GitlabConnector plugin
 
 A Kimai 2 plugin, which send duration of cards to GitLab spend issues of timesheet.
 
@@ -7,7 +7,7 @@ A Kimai 2 plugin, which send duration of cards to GitLab spend issues of timeshe
 First clone it to your Kimai installation `plugins` directory:
 ```
 cd /kimai/var/plugins/
-git clone https://github.com/LibreCode/GitLabBundle.git
+git clone https://github.com/Physikbuddha/GitlabConnector.git
 ```
 
 And then rebuild the cache: 
@@ -16,12 +16,12 @@ cd /kimai/
 bin/console kimai:reload -n
 ```
 
-You could also [download it as zip](https://github.com/LibreCode/GitLabBundle/archive/master.zip) and upload the directory via FTP:
+You could also [download it as zip](https://github.com/Physikbuddha/GitlabConnector/archive/refs/heads/main.zip) and upload the directory via FTP:
 
 ```
 /kimai/var/plugins/
-├── GitLabBundle
-│   ├── GitLabBundle.php
+├── GitlabConnector plugin
+│   ├── GitlabConnector plugin.php
 |   └ ... more files and directories follow here ... 
 ```
 ## How to use?

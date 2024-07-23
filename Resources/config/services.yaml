@@ -4,7 +4,7 @@ services:
         autoconfigure: true
         public: false
 
-    KimaiPlugin\GitLabBundle\:
+    KimaiPlugin\GitlabConnector\:
         resource: '../../*'
         exclude:
           - '../../{Migrations}'

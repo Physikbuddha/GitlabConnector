@@ -1,6 +1,6 @@
 <?php
 
-namespace KimaiPlugin\GitLabBundle\Command;
+namespace KimaiPlugin\GitlabConnector\Command;
 
 use App\Command\AbstractBundleInstallerCommand;
 

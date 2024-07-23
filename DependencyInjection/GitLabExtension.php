@@ -1,14 +1,6 @@
 <?php
 
-/*
- * This file is part of the GitLabBundle for Kimai 2.
- * All rights reserved by Kevin Papst (www.keleo.de).
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
-
-namespace KimaiPlugin\GitLabBundle\DependencyInjection;
+namespace KimaiPlugin\GitlabConnector\DependencyInjection;
 
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;

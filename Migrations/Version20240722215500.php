@@ -1,6 +1,6 @@
 <?php
 
-namespace KimaiPlugin\GitLabBundle\Migrations;
+namespace KimaiPlugin\GitlabConnector\Migrations;
 
 use App\Doctrine\AbstractMigration;
 use Doctrine\DBAL\Schema\Schema;
