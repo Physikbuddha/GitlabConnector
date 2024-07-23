@@ -32,7 +32,7 @@
     },
     "extra": {
         "kimai": {
-            "require": "1.11",
+            "require": 21800,
             "version": "0.2",
             "name": "GitLab integration"
         }
@@ -52,7 +52,7 @@
         "friendsofphp/php-cs-fixer": "^2.15",
         "phpstan/phpstan": "^0.12.19",
         "phpstan/phpstan-doctrine": "^0.12.10",
-        "kevinpapst/kimai2": "1.11",
+        "kevinpapst/kimai2": "^2.18",
         "symfony/console": "^4.0",
         "symfony/event-dispatcher": "^4.0"
     }
