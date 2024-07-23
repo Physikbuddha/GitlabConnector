@@ -6,4 +6,6 @@ services:
 
     KimaiPlugin\GitLabBundle\:
         resource: '../../*'
-        exclude: '../../{Resources}'
+        exclude:
+          - '../../{Migrations}'
+          - '../../{Resources}'
