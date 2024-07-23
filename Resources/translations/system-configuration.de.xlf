@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <xliff xmlns="urn:oasis:names:tc:xliff:document:1.2" version="1.2">
-  <file source-language="en" target-language="en" datatype="plaintext" original="system-configuration.en.xlf">
+  <file source-language="en" target-language="de" datatype="plaintext" original="system-configuration.en.xlf">
     <body>
       <trans-unit id="nZbZ1bG" resname="gitlab">
         <source>gitlab</source>
@@ -8,7 +8,7 @@
       </trans-unit>
       <trans-unit id="_jaGmUp" resname="gitlab_instance_base_url">
         <source>gitlab_instance_base_url</source>
-        <target>Instance base URL</target>
+        <target>GitLab-URL</target>
       </trans-unit>
     </body>
   </file>

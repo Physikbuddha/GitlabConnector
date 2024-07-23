@@ -10,7 +10,9 @@
 
 namespace KimaiPlugin\GitLabBundle\EventSubscriber;
 
+use App\Entity\UserPreference;
 use App\Event\SystemConfigurationEvent;
+use App\Event\UserPreferenceEvent;
 use App\Form\Model\Configuration;
 use App\Form\Model\SystemConfiguration as SystemConfigurationModel;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -19,30 +21,32 @@ use Symfony\Component\Form\Extension\Core\Type\UrlType;
 
 final class SystemConfigurationSubscriber implements EventSubscriberInterface
 {
-    public static function getSubscribedEvents()
+    public static function getSubscribedEvents(): array
     {
         return [
             SystemConfigurationEvent::class => ['onSystemConfiguration', 100],
+            UserPreferenceEvent::class => ['onUserPreferenceConfiguration', 100]
         ];
     }
 
     public function onSystemConfiguration(SystemConfigurationEvent $event)
     {
-        $event->addConfiguration((new SystemConfigurationModel())
-            ->setSection('gitlab')
+        $event->addConfiguration((new SystemConfigurationModel('gitlab'))
             ->setConfiguration([
-                (new Configuration())
-                    ->setName('gitlab_private_token')
-                    ->setLabel('gitlab.private_token')
-                    ->setOptions(['help' => 'help.gitlab.private_token'])
+                (new Configuration('gitlab_instance_base_url'))
                     ->setTranslationDomain('system-configuration')
-                    ->setType(TextType::class),
-                (new Configuration())
-                    ->setName('gitlab_instance_base_url')
-                    ->setLabel('gitlab.instance_base_url')
-                    ->setTranslationDomain('system-configuration')
+                    ->setOptions(['required' => false])
                     ->setType(UrlType::class),
             ])
         );
+    }
+
+    public function onUserPreferenceConfiguration(UserPreferenceEvent $event)
+    {
+        $pref = new UserPreference('gitlab_private_token');
+        $pref->setSection('gitlab');
+        $pref->setType(TextType::class);
+        $pref->setOptions(['required' => false]);
+        $event->addPreference($pref);
     }
 }
