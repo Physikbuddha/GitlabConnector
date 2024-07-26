@@ -4,7 +4,7 @@
     <body>
       <trans-unit id="LnGdRFf" resname="gitlab_private_token">
         <source>gitlab_private_token</source>
-        <target>Gitlab Personal Access Token</target>
+        <target>GitLab Personal Access Token</target>
       </trans-unit>
       <trans-unit id="yO00eQj" resname="gitlab_project_id">
         <source>gitlab_project_id</source>
