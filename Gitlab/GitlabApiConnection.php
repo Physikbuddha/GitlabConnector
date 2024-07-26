@@ -117,7 +117,7 @@ class GitlabApiConnection
         ];
 
         // spentAt is optional and doesn't allow a date in the future
-        if (!$spentAt || $spentAt <= new DateTime('now')) {
+        if ($spentAt && $spentAt <= new DateTime('now')) {
             $variables['input']['spentAt'] = $spentAt->format('c');
         }
 
