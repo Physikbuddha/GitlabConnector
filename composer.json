@@ -1,7 +1,7 @@
 {
     "name": "physikbuddha/kimai-gitlab-connector-plugin",
     "description": "Integrate GitLab estimate and spend to Kimai",
-    "homepage": "https://github.com/physikbuddha/GitlabConnector",
+    "homepage": "https://github.com/physikbuddha/GitlabConnectorBundle",
     "type": "kimai-plugin",
     "version": "0.2",
     "keywords": [
@@ -22,7 +22,7 @@
     ],
     "autoload": {
         "psr-4": {
-            "KimaiPlugin\\GitlabConnector\\": ""
+            "KimaiPlugin\\GitlabConnectorBundle\\": ""
         }
     },
     "config": {

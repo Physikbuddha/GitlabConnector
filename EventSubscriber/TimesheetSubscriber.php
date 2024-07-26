@@ -1,6 +1,6 @@
 <?php
 
-namespace KimaiPlugin\GitlabConnector\EventSubscriber;
+namespace KimaiPlugin\GitlabConnectorBundle\EventSubscriber;
 
 use App\Configuration\SystemConfiguration;
 use App\Entity\Timesheet;
