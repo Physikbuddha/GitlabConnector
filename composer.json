@@ -26,9 +26,6 @@
         }
     },
     "config": {
-        "platform": {
-            "php": "8.0"
-        },
         "preferred-install": {
             "*": "dist"
         },
@@ -51,6 +48,9 @@
             "@codestyle-check",
             "@phpstan"
         ]
+    },
+    "require": {
+        "php": "^8.1"
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^2.15",
