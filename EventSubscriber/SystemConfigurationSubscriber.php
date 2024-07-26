@@ -16,12 +16,12 @@ final class SystemConfigurationSubscriber implements EventSubscriberInterface
     public static function getSubscribedEvents(): array
     {
         return [
-            SystemConfigurationEvent::class => ['onSystemConfiguration', 100],
-            UserPreferenceEvent::class => ['onUserPreferenceConfiguration', 100]
+            SystemConfigurationEvent::class => ['extendSystemConfiguration', 100],
+            UserPreferenceEvent::class => ['extendUserPreferences', 100]
         ];
     }
 
-    public function onSystemConfiguration(SystemConfigurationEvent $event)
+    public function extendSystemConfiguration(SystemConfigurationEvent $event)
     {
         $event->addConfiguration((new SystemConfigurationModel('gitlab'))
             ->setConfiguration([
@@ -33,7 +33,7 @@ final class SystemConfigurationSubscriber implements EventSubscriberInterface
         );
     }
 
-    public function onUserPreferenceConfiguration(UserPreferenceEvent $event)
+    public function extendUserPreferences(UserPreferenceEvent $event)
     {
         $pref = new UserPreference('gitlab_private_token');
         $pref->setSection('gitlab');

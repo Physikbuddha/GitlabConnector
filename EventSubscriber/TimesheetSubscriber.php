@@ -4,142 +4,203 @@ namespace KimaiPlugin\GitlabConnectorBundle\EventSubscriber;
 
 use App\Configuration\SystemConfiguration;
 use App\Entity\Timesheet;
+use App\Entity\User;
+use App\Entity\UserPreference;
 use App\Event\AbstractTimesheetEvent;
 use App\Event\TimesheetCreatePostEvent;
 use App\Event\TimesheetDeleteMultiplePreEvent;
 use App\Event\TimesheetDeletePreEvent;
-use App\Event\TimesheetDuplicatePostEvent;
 use App\Event\TimesheetStopPostEvent;
 use App\Event\TimesheetUpdateMultiplePostEvent;
 use App\Event\TimesheetUpdatePostEvent;
-use Doctrine\ORM\EntityManagerInterface;
+use KimaiPlugin\GitlabConnectorBundle\Gitlab\GitlabApiConnection;
+use KimaiPlugin\GitlabConnectorBundle\Gitlab\GitlabApiConnectionFactoryInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
-use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
-use Symfony\Contracts\HttpClient\HttpClientInterface;
 
+/**
+ * @phpstan-import-type Timelog from GitlabApiConnection
+ */
 class TimesheetSubscriber implements EventSubscriberInterface
 {
-    /**
-     * @var SystemConfiguration
-     */
-    private $configuration;
-    /**
-     * @var EntityManagerInterface
-     */
-    private $entityManager;
-    /**
-     * @var HttpClientInterface
-     */
-    private $client;
-    /**
-     * @var string
-     */
-    private $gitLabToken;
-    /**
-     * @var string
-     */
-    private $gitLabBaseUrl;
-    public function __construct(SystemConfiguration $configuration, EntityManagerInterface $entityManager, HttpClientInterface $client)
-    {
-        $this->configuration = $configuration;
-        $this->entityManager = $entityManager;
-        $this->client = $client;
-        $this->gitLabToken = $this->configuration->find('gitlab_private_token');
-        $this->gitLabBaseUrl = $this->configuration->find('gitlab_instance_base_url');
+    public function __construct(
+        private readonly SystemConfiguration $configuration,
+        private readonly GitlabApiConnectionFactoryInterface $apiConnectionFactory
+    ) {
     }
 
     public static function getSubscribedEvents()
     {
+        // TimesheetDuplicatePostEvent and TimesheetRestartPostEvent are not neccessary,
+        // since TimesheetCreatePostEvent is triggered along as well
         return [
-            TimesheetCreatePostEvent::class => ['onAction', 100],
-            TimesheetUpdatePostEvent::class => ['onAction', 100],
-            TimesheetDuplicatePostEvent::class => ['onAction', 100],
-            TimesheetStopPostEvent::class => ['onAction', 100],
-            TimesheetDeletePreEvent::class => ['onAction', 100]
+            TimesheetCreatePostEvent::class => ['onCreateUpdate', 100],
+            TimesheetUpdatePostEvent::class => ['onCreateUpdate', 100],
+            TimesheetStopPostEvent::class => ['onCreateUpdate', 100],
+            TimesheetDeletePreEvent::class => ['onDelete', 100],
+            TimesheetUpdateMultiplePostEvent::class => ['onUpdateMultiple', 100],
+            TimesheetDeleteMultiplePreEvent::class => ['onDeleteMultiple', 100],
         ];
     }
 
-    public function onAction(AbstractTimesheetEvent $event): void
+    public function onCreateUpdate(AbstractTimesheetEvent $event): void
     {
-        if (!$this->gitLabToken) {
+        $this->processTimesheet($event->getTimesheet(), false);
+    }
+
+    public function onDelete(TimesheetDeletePreEvent $event): void
+    {
+        $this->processTimesheet($event->getTimesheet(), true);
+    }
+
+    public function onUpdateMultiple(TimesheetUpdateMultiplePostEvent $event): void
+    {
+        foreach ($event->getTimesheets() as $timesheet) {
+            $this->processTimesheet($timesheet, false);
+        }
+    }
+
+    public function onDeleteMultiple(TimesheetDeleteMultiplePreEvent $event): void
+    {
+        foreach ($event->getTimesheets() as $timesheet) {
+            $this->processTimesheet($timesheet, true);
+        }
+    }
+
+    private function processTimesheet(Timesheet $timesheet, bool $deleteTimesheet): void
+    {
+        $gitlabBaseUrl = $this->getGitlabBaseUrl();
+        $gitlabToken = $this->getGitlabAccessToken($timesheet->getUser());
+
+        if (!$gitlabBaseUrl || !$gitlabToken) {
             return;
         }
-        $timesheet = $event->getTimesheet();
-        $issueId = $timesheet->getMetaField('gitlab_issue_id');
-        if ($issueId->getValue() < 1) {
-            return;
-        }
+
+        // Trim any trailing slashes from the base URL
+        $gitlabBaseUrl = trim($gitlabBaseUrl, '/');
+
         $project = $timesheet->getProject();
-        $projectId = $project->getMetaField('gitlab_project_id');
-        if (!$projectId) {
+
+        // Check if the timesheet description contains a Gitlab issue URL or ID
+        // Fall back to the meta field settings if no issue is found in the description
+        $issueIdentifiers = $this->extractGitlabIssueIdentifiers($gitlabBaseUrl, $timesheet->getDescription() ?? '');
+        $projectId =
+            $issueIdentifiers['projectPath'] ??
+            $project->getMetaField('gitlab_project_id')?->getValue();
+        $issueId =
+            $issueIdentifiers['issueId'] ??
+            $timesheet->getMetaField('gitlab_issue_id')?->getValue();
+
+        if (!$projectId || !$issueId) {
             return;
         }
-        $totalDuration = $this->sumDuration($projectId->getValue(), $issueId->getValue());
-        if ($totalDuration < 1) {
+
+        // A Gitlab project full path should not start or end with a slash
+        $projectId = trim($projectId, '/');
+
+        if (is_numeric($projectId)) {
+            // Project id was provided as integer and not as full path.
+            // Convert it to an integer to let the API connection class convert it to a full path automatically.
+            $projectId = (int)$projectId;
+        }
+
+        $connection = $this->apiConnectionFactory->createConnection($gitlabBaseUrl, $gitlabToken);
+
+        // Check if we have any existing timelog containing the Kimai timesheet ID
+        $timelogsForIssue = $connection->getTimelogsForIssue($projectId, $issueId);
+        $existingTimelogs = $this->filterTimelogsByTimesheet($timelogsForIssue['timelogs'], $timesheet->getId());
+        foreach ($existingTimelogs as $existingTimelog) {
+            // Delete all existing timelogs for this timesheet, so we can create a new one with the current information.
+            $connection->deleteTimelog($existingTimelog['id']);
+        }
+
+        if ($deleteTimesheet || !$timesheet->getDuration()) {
+            // No duration is set on the timesheet, or it's being deleted.
+            // Don't create a new timelog in Gitlab.
             return;
         }
-        $this->updateSpend($projectId->getValue(), $issueId->getValue(), $totalDuration);
+
+        $connection->storeTimelog(
+            $timesheet->getId(),
+            $timelogsForIssue['issue'],
+            $timesheet->getBegin(),
+            $timesheet->getDescription() ?? '',
+            $timesheet->getDuration(),
+        );
     }
 
-    private function sumDuration($projectId, $issueId): int
-    {
-        $qb = $this->entityManager->createQueryBuilder();
-        $qb->select('COALESCE(SUM(t.duration), 0) as duration')
-            ->from(Timesheet::class, 't')
-            ->join('t.meta', 'tm')
-            ->join('t.project', 'p')
-            ->join('p.meta', 'pm')
-            ->where($qb->expr()->eq('tm.name', ':timesheetMetaName'))
-            ->setParameter('timesheetMetaName', 'gitlab_issue_id')
-            ->andWhere($qb->expr()->eq('tm.value', ':timesheetMetaValue'))
-            ->setParameter('timesheetMetaValue', $issueId)
-            ->andWhere($qb->expr()->eq('pm.name', ':projectMetaName'))
-            ->setParameter('projectMetaName', 'gitlab_project_id')
-            ->andWhere($qb->expr()->eq('pm.value', ':projectMetaValue'))
-            ->setParameter('projectMetaValue', $projectId)
-            ->groupBy('p.id');
-        try {
-            return (int) $qb->getQuery()->getSingleScalarResult();
-        } catch (\Doctrine\ORM\NoResultException $e) {
-            return 0;
+    /**
+     * Scans the Kimai timesheet description text for Gitlab issue URLs or IDs.
+     * Returns an array containing the project path and issue ID if found.
+     *
+     * @param string $gitlabBaseUrl
+     * @param string $timesheetDescription
+     * @return array{projectPath: string|null, issueId: int|null}
+     */
+    private function extractGitlabIssueIdentifiers(string $gitlabBaseUrl, string $timesheetDescription): array {
+        // Pattern to match a full Gitlab issue URL anywhere in brackets
+        $patternFullUrlInBrackets = sprintf(
+            '/\[%s\/([\w\-\/]+)\/-\/issues\/(\d+)\]/',
+            preg_quote($gitlabBaseUrl, '/')
+        );
+        // Pattern to match a full Gitlab issue URL at the start of the description
+        $patternFullUrlAtStart = sprintf(
+            '/^%s\/([\w\-\/]+)\/-\/issues\/(\d+)/',
+            preg_quote($gitlabBaseUrl, '/')
+        );
+        // Pattern to match an issue ID anywhere in brackets
+        $patternIssueIdInBrackets = '/\[\#(\d+)\]/';
+        // Pattern to match an issue ID at the start of the description
+        $patternIssueIdAtStart = '/^\#(\d+)/';
+
+        // Check for a Gitlab issue URL anywhere in the description. It needs to be contained in brackets.
+        // ex. "[https://gitlab.example.com/somegroup/somesubgroup/someproject/-/issues/12345]"
+        if (preg_match($patternFullUrlInBrackets, $timesheetDescription, $matches)) {
+            return ['projectPath' => $matches[1], 'issueId' => (int)$matches[2]];
         }
+        // Check if the description starts with a Gitlab issue URL.
+        // ex. "https://gitlab.example.com/somegroup/somesubgroup/someproject/-/issues/12345"
+        if (preg_match($patternFullUrlAtStart, $timesheetDescription, $matches)) {
+            return ['projectPath' => $matches[1], 'issueId' => (int)$matches[2]];
+        }
+        // Check if the description contains a loose issue ID. It needs to be contained in brackets.
+        // ex. "[#12345]"
+        if (preg_match($patternIssueIdInBrackets, $timesheetDescription, $matches)) {
+            return ['projectPath' => null, 'issueId' => (int)$matches[1]];
+        }
+        // Check if the description starts with a loose issue ID.
+        // ex. "#12345"
+        if (preg_match($patternIssueIdAtStart, $timesheetDescription, $matches)) {
+            return ['projectPath' => null, 'issueId' => (int)$matches[1]];
+        }
+
+        // If none of the patterns matched, return null for both values
+        return ['projectPath' => null, 'issueId' => null];
     }
 
-    private function updateSpend($projectId, $issueId, $totalDuration)
+    /**
+     * @param Timelog[] $timelogs
+     * @param int $timesheetId
+     * @return Timelog[]
+     */
+    private function filterTimelogsByTimesheet(array $timelogs, int $timesheetId): array
     {
-        $humanDuration = $this->secondsToHuman($totalDuration);
-        try {
-            $response = $this->client->request(
-                'POST',
-                $this->gitLabBaseUrl . '/api/v4/projects/' . $projectId . '/issues/' . $issueId . '/reset_spent_time', [
-                'headers' => [
-                    'PRIVATE-TOKEN' => $this->gitLabToken,
-                ],
-            ]);
-            $response = $this->client->request(
-                'POST',
-                $this->gitLabBaseUrl . '/api/v4/projects/' . $projectId . '/issues/' . $issueId . '/add_spent_time?duration=' . $humanDuration, [
-                'headers' => [
-                    'PRIVATE-TOKEN' => $this->gitLabToken,
-                ],
-            ]);
-        } catch (TransportExceptionInterface $e) {
-        }
+        return array_filter(
+            $timelogs,
+            fn (array $timelog) => str_ends_with($timelog['summary'], "[Kimai-ID $timesheetId]")
+        );
     }
 
-    private function secondsToHuman(int $totalDuration): string
+    private function getGitlabBaseUrl(): ?string
     {
-        $human = '';
+        return $this->configuration->find('gitlab_instance_base_url');
+    }
 
-        $hours = intdiv(intdiv($totalDuration, 60), 60);
-        if ($hours >= 1) {
-            $human = $hours.'h';
-        }
-
-        $min = ($totalDuration / 60) % 60;
-        if ($min) {
-            $human.= $min . 'm';
-        }
-        return $human;
+    private function getGitlabAccessToken(User $user): ?string
+    {
+        /** @var ?UserPreference $gitlabTokenPreference */
+        $gitlabTokenPreference = $user->getPreferences()->findFirst(
+            fn(int $key, UserPreference $pref) => $pref->getName() === 'gitlab_private_token'
+        );
+        return $gitlabTokenPreference?->getValue();
     }
 }

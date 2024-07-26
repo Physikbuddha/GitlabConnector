@@ -3,28 +3,20 @@
 namespace KimaiPlugin\GitlabConnectorBundle\EventSubscriber;
 
 use App\Configuration\SystemConfiguration;
-use App\Entity\MetaTableTypeInterface;
 use App\Entity\ProjectMeta;
 use App\Entity\TimesheetMeta;
+use App\Entity\User;
+use App\Entity\UserPreference;
 use App\Event\ProjectMetaDefinitionEvent;
 use App\Event\TimesheetMetaDefinitionEvent;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
+use Symfony\Component\Form\Extension\Core\Type\TextType;
 
 class MetaFieldSubscriber implements EventSubscriberInterface
 {
-    /**
-     * @var SystemConfiguration
-     */
-    private $configuration;
-    /**
-     * @var string
-     */
-    private $gitLabToken;
-    public function __construct(SystemConfiguration $configuration)
+    public function __construct(private readonly SystemConfiguration $configuration)
     {
-        $this->configuration = $configuration;
-        $this->gitlabToken = $this->configuration->find('gitlab_private_token');
     }
 
     public static function getSubscribedEvents(): array
@@ -35,37 +27,51 @@ class MetaFieldSubscriber implements EventSubscriberInterface
         ];
     }
 
-    private function getProjectMetaField(): MetaTableTypeInterface
-    {
-        return (new ProjectMeta())
-            ->setName('gitlab_project_id')
-            ->setLabel('GitLab project ID')
-            ->setType(IntegerType::class)
-            ->setIsVisible(true);
-    }
-
     public function loadProjectMeta(ProjectMetaDefinitionEvent $event)
     {
-        if (!$this->gitlabToken) {
+        if (!$this->getGitlabBaseUrl()) {
+            // Only add the project ID field if a Gitlab URL has been configured.
             return;
         }
-        $event->getEntity()->setMetaField($this->getProjectMetaField());
-    }
 
-    private function getTimesheetMetaField(): MetaTableTypeInterface
-    {
-        return (new TimesheetMeta())
-            ->setName('gitlab_issue_id')
-            ->setLabel('GitLab issue ID')
-            ->setType(IntegerType::class)
+        $newField = (new ProjectMeta())
+            ->setName('gitlab_project_id')
+            ->setType(TextType::class)
             ->setIsVisible(true);
+        $event->getEntity()->setMetaField($newField);
     }
 
     public function loadTimesheetMeta(TimesheetMetaDefinitionEvent $event)
     {
-        if (!$this->gitlabToken) {
+        if (
+            !$this->getGitlabBaseUrl() ||
+            $event->getEntity()->getUser() !== null && !$this->getGitlabAccessToken($event->getEntity()->getUser()) ||
+            $event->getEntity()->getProject() !== null && !$event->getEntity()->getProject()->getMetaField('gitlab_project_id')
+        ) {
+            // Only add the issue ID field if a Gitlab URL and an access token have been configured.
+            // If the timesheet has a project already set, hide the field if the Kimai project hasn't been configured with a Gitlab project ID.
+            // Ignore the project restriction if a new timesheet is being created, and project is still set to null.
             return;
         }
-        $event->getEntity()->setMetaField($this->getTimesheetMetaField());
+
+        $newField = (new TimesheetMeta())
+            ->setName('gitlab_issue_id')
+            ->setType(IntegerType::class)
+            ->setIsVisible(true);
+        $event->getEntity()->setMetaField($newField);
+    }
+
+    private function getGitlabBaseUrl(): ?string
+    {
+        return $this->configuration->find('gitlab_instance_base_url');
+    }
+
+    private function getGitlabAccessToken(User $user): ?string
+    {
+        /** @var ?UserPreference $gitlabTokenPreference */
+        $gitlabTokenPreference = $user->getPreferences()->findFirst(
+            fn(int $key, UserPreference $pref) => $pref->getName() === 'gitlab_private_token'
+        );
+        return $gitlabTokenPreference?->getValue();
     }
 }

@@ -6,6 +6,14 @@
         <source>gitlab_private_token</source>
         <target>Gitlab Personal Access Token</target>
       </trans-unit>
+      <trans-unit id="yO00eQj" resname="gitlab_project_id">
+        <source>gitlab_project_id</source>
+        <target>GitLab project path or ID</target>
+      </trans-unit>
+      <trans-unit id="GPdOoU9" resname="gitlab_issue_id">
+        <source>gitlab_issue_id</source>
+        <target>GitLab issue ID</target>
+      </trans-unit>
     </body>
   </file>
 </xliff>

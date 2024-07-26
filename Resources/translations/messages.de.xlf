@@ -4,7 +4,15 @@
     <body>
       <trans-unit id="LnGdRFf" resname="gitlab_private_token">
         <source>gitlab_private_token</source>
-        <target>Gitlab Personal Access Token</target>
+        <target>Persönliches Access-Token für GitLab</target>
+      </trans-unit>
+      <trans-unit id="yO00eQj" resname="gitlab_project_id">
+        <source>gitlab_project_id</source>
+        <target>GitLab-Projektpfad oder -ID</target>
+      </trans-unit>
+      <trans-unit id="GPdOoU9" resname="gitlab_issue_id">
+        <source>gitlab_issue_id</source>
+        <target>GitLab-Issue-ID</target>
       </trans-unit>
     </body>
   </file>
