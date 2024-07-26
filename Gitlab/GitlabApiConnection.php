@@ -88,6 +88,15 @@ class GitlabApiConnection
         ];
 
         $response = $this->callGraphqlApi($data);
+        if ($response['workspace'] === null) {
+            $url = $this->baseUrl . '/' . $project;
+            throw new GitlabItemDoesNotExistException("There is no GitLab project at $url.");
+        }
+        if ($response['workspace']['issuable'] === null) {
+            $url = $this->baseUrl . '/' . $project;
+            throw new GitlabItemDoesNotExistException("There is no GitLab issue with the ID $issueId in the project $url.");
+        }
+
         return [
             'issue' => $response['workspace']['issuable']['id'],
             'timelogs' => $response['workspace']['issuable']['timelogs']['nodes'] ?? []
