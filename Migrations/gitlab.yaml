@@ -1,2 +1,0 @@
-migrations_paths:
-    KimaiPlugin\GitlabConnector\Migrations: var/plugins/GitlabConnector/Migrations
