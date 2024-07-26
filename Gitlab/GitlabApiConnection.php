@@ -6,6 +6,7 @@ use DateTime;
 use DateTimeInterface;
 use KimaiPlugin\GitlabConnectorBundle\Exception\GitlabItemDoesNotExistException;
 use KimaiPlugin\GitlabConnectorBundle\Exception\GraphqlException;
+use KimaiPlugin\GitlabConnectorBundle\Utility\TimelogUtility;
 use Symfony\Component\HttpClient\Exception\ClientException;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -105,11 +106,7 @@ class GitlabApiConnection
 
     public function storeTimelog(int $timesheetId, string $gitlabIssueGid, ?DateTimeInterface $spentAt, string $description, int $timeSpent): string
     {
-        $summaryParts = [
-            $description,
-            sprintf('[Kimai-ID %s]', $timesheetId)
-        ];
-        $summary = implode(' ', array_filter($summaryParts));
+        $summary = TimelogUtility::buildTimelogSummary($timesheetId, $description);
 
         $variables = [
             'input' => [

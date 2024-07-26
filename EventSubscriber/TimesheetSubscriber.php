@@ -13,8 +13,10 @@ use App\Event\TimesheetDeletePreEvent;
 use App\Event\TimesheetStopPostEvent;
 use App\Event\TimesheetUpdateMultiplePostEvent;
 use App\Event\TimesheetUpdatePostEvent;
+use DateTime;
 use KimaiPlugin\GitlabConnectorBundle\Gitlab\GitlabApiConnection;
 use KimaiPlugin\GitlabConnectorBundle\Gitlab\GitlabApiConnectionFactoryInterface;
+use KimaiPlugin\GitlabConnectorBundle\Utility\TimelogUtility;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
@@ -66,7 +68,7 @@ class TimesheetSubscriber implements EventSubscriberInterface
         }
     }
 
-    private function processTimesheet(Timesheet $timesheet, bool $deleteTimesheet): void
+    private function processTimesheet(Timesheet $timesheet, bool $timesheetIsGettingDeleted): void
     {
         $gitlabBaseUrl = $this->getGitlabBaseUrl();
         $gitlabToken = $this->getGitlabAccessToken($timesheet->getUser());
@@ -110,12 +112,27 @@ class TimesheetSubscriber implements EventSubscriberInterface
         // Check if we have any existing timelog containing the Kimai timesheet ID
         $timelogsForIssue = $connection->getTimelogsForIssue($projectId, $issueId);
         $existingTimelogs = $this->filterTimelogsByTimesheet($timelogsForIssue['timelogs'], $timesheet->getId());
-        foreach ($existingTimelogs as $existingTimelog) {
-            // Delete all existing timelogs for this timesheet, so we can create a new one with the current information.
+
+        if (count($existingTimelogs) > 1) {
+            // If there's more than one Gitlab timelog for this timesheet, delete all of them.
+            // A fresh one will be created after.
+            foreach ($existingTimelogs as $existingTimelog) {
+                $connection->deleteTimelog($existingTimelog['id']);
+            }
+        } elseif (count($existingTimelogs) === 1) {
+            // There is already a timelog for this timesheet, check if it needs updating.
+            $existingTimelog = reset($existingTimelogs);
+            if (!$timesheetIsGettingDeleted && !$this->timelogNeedsUpdate($existingTimelog, $timesheet)) {
+                // No changes have been made to the timesheet, no need to update the timelog.
+                return;
+            }
+
+            // Delete the existing timelog for this timesheet.
+            // A fresh one will be created after.
             $connection->deleteTimelog($existingTimelog['id']);
         }
 
-        if ($deleteTimesheet || !$timesheet->getDuration()) {
+        if ($timesheetIsGettingDeleted || !$timesheet->getDuration()) {
             // No duration is set on the timesheet, or it's being deleted.
             // Don't create a new timelog in Gitlab.
             return;
@@ -128,6 +145,33 @@ class TimesheetSubscriber implements EventSubscriberInterface
             $timesheet->getDescription() ?? '',
             $timesheet->getDuration(),
         );
+    }
+
+    /**
+     * @param Timelog $existingTimelog
+     * @param Timesheet $timesheet
+     * @return bool
+     */
+    private function timelogNeedsUpdate(array $existingTimelog, Timesheet $timesheet): bool
+    {
+        if ($existingTimelog['timeSpent'] !== $timesheet->getDuration()) {
+            return true;
+        }
+
+        $newDescription = TimelogUtility::buildTimelogSummary(
+            $timesheet->getId(),
+            $timesheet->getDescription()
+        );
+        if ($existingTimelog['summary'] !== $newDescription) {
+            return true;
+        }
+
+        $oldSpentAt = new DateTime($existingTimelog['spentAt']);
+        if ($oldSpentAt->getTimestamp() !== $timesheet->getBegin()->getTimestamp()) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
