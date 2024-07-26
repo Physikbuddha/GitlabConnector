@@ -79,18 +79,20 @@ class TimesheetSubscriber implements EventSubscriberInterface
         $gitlabBaseUrl = trim($gitlabBaseUrl, '/');
 
         $project = $timesheet->getProject();
+        $projectId = $project->getMetaField('gitlab_project_id')?->getValue();
+        $issueId = $timesheet->getMetaField('gitlab_issue_id')?->getValue();
 
-        // Check if the timesheet description contains a Gitlab issue URL or ID
-        // Fall back to the meta field settings if no issue is found in the description
-        $issueIdentifiers = $this->extractGitlabIssueIdentifiers($gitlabBaseUrl, $timesheet->getDescription() ?? '');
-        $projectId =
-            $issueIdentifiers['projectPath'] ??
-            $project->getMetaField('gitlab_project_id')?->getValue();
-        $issueId =
-            $issueIdentifiers['issueId'] ??
-            $timesheet->getMetaField('gitlab_issue_id')?->getValue();
+        if (!$issueId) {
+            // No Gitlab issue ID has been set in the timesheet meta fields.
+            // Check if issue information has been provided in the timesheet description.
+            $issueIdentifiers = $this->extractGitlabIssueIdentifiers($gitlabBaseUrl, $timesheet->getDescription() ?? '');
+
+            $projectId = $issueIdentifiers['projectPath'] ?? $projectId;
+            $issueId = $issueIdentifiers['issueId'] ?? $issueId;
+        }
 
         if (!$projectId || !$issueId) {
+            // Still no luck, don't send anything to Gitlab.
             return;
         }
 
